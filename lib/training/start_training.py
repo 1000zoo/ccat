@@ -4,7 +4,7 @@ from lib.etc.train_parameters import CustomConfig
 from lib.etc.private_constants import MODEL_PATH, FIGURE_PATH
 
 from train_model import *
-from lib.prerpocessing.preprocess_data import *
+from lib.prepocessing.preprocess_data import *
 from matplotlib import pyplot as plt
 
 def main():
