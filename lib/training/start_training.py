@@ -1,11 +1,10 @@
 import keras.callbacks
-import os
 
 from lib.etc.train_parameters import CustomConfig
 from lib.etc.private_constants import MODEL_PATH, FIGURE_PATH
 
 from train_model import *
-from preprocess_data import *
+from lib.prerpocessing.preprocess_data import *
 from matplotlib import pyplot as plt
 
 def main():
@@ -61,7 +60,7 @@ def main():
 
     # Plot training data results
     ax11 = fig.add_subplot(211)
-    ax11.plot(train_X[:, 3], label='IBM Closing Returns')
+    ax11.plot(train[:, 3], label='IBM Closing Returns')
     ax11.plot(np.arange(config.sequence_length, train_pred.shape[0] + config.sequence_length), train_pred, linewidth=3,
               label='Predicted IBM Closing Returns')
     ax11.set_title("Training Data", fontsize=18)
@@ -71,7 +70,7 @@ def main():
 
     # Plot test data results
     ax31 = fig.add_subplot(212)
-    ax31.plot(test_X[:, 3], label='IBM Closing Returns')
+    ax31.plot(test[:, 3], label='IBM Closing Returns')
     ax31.plot(np.arange(config.sequence_length, test_pred.shape[0] + config.sequence_length), test_pred, linewidth=3,
               label='Predicted IBM Closing Returns')
     ax31.set_title("Test Data", fontsize=18)
