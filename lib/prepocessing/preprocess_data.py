@@ -1,123 +1,78 @@
 import os
+import sys
+
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+sys.path.append(root_path)
+
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-from lib.etc.private_constants import TRAIN_DATA_PATH
+from lib.etc.private_constants import DATA_PATH
+from lib.etc.train_parameters import CustomConfig
 
+def load_preprocessed_data(sequence_length, reduce=0):
+    data = load_data(reduce)
+    data = scaling(data)
+    print(data.shape)
+    X, y = slicing(data, sequence_length)
+    val = int(0.7 * len(data))
+    test = int(0.85 * len(data))
 
-def load_data(interval):
-    interval = interval.split(".")[0] + ".csv"
-    path = os.path.join(TRAIN_DATA_PATH, 'ex', interval)
-    d = pd.read_csv(path)
-    d.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
-    d['date'] = pd.to_datetime(d['date'])
-    return d
+    return (X[:val], y[:val]), (X[val:test], y[val:test]), (X[test:], y[test:])
 
+def load_dataset(sequence_length, batch_size, reduce=0):
+    data = load_data(reduce)
+    print(data.shape)
 
-def split_data(d: pd.DataFrame):
-    nr = d.shape[0]
-    split_idx = int(nr * 0.8)
+    data = scaling(data)
+    return slicing_to_dataset(data, sequence_length, batch_size)
 
-    _train_data = d.iloc[:split_idx]
-    _test_data = d.iloc[split_idx:]
+def slicing_to_dataset(data, sequence_length, batch_size):
+    import tensorflow as tf
+    dataset = tf.data.Dataset.from_tensor_slices(data)
+    dataset = dataset.window(sequence_length + 1, shift=1, drop_remainder=True)
+    dataset = dataset.flat_map(lambda window : window.batch(sequence_length + 1))
+    dataset = dataset.map(lambda window: (window[:-1], window[-1:][0][3]))
 
-    return _train_data, _test_data
+    train_size = int(0.7 * len(data))
+    val_size = int(0.15 * len(data))
+    test_size = int(0.15 * len(data))
 
+    # dataset = dataset.shuffle(len(data))
 
-def preprocessing_only_close(train_data, test_data):
-    train_data = train_data[['close']]
-    test_data = test_data[['close']]
+    train_dataset = dataset.take(train_size)
+    test_and_val = dataset.skip(train_size)
+    
+    val_dataset = test_and_val.take(val_size)
+    test_dataset = test_and_val.skip(val_size)
 
-    # Fit the scaler on the training data
+    return train_dataset.batch(batch_size), val_dataset.batch(batch_size), test_dataset.batch(batch_size)
+
+def slicing(data, sequence_length):
+    X = data[:]
+    y = data[:, 3]
+
+    X_window, y_window = [], []
+    for i in range(len(X) - sequence_length):
+        X_window.append(X[i : i+sequence_length, :])
+        y_window.append(y[i + sequence_length])
+
+    return np.array(X_window), np.array(y_window)
+
+def scaling(data):
     scaler = MinMaxScaler()
-    scaler.fit(train_data)
+    ohlc = data[["open", "high", "low", "close"]]
+    v = data[["volume"]]
 
-    # Scale the training data
-    train_data = scaler.transform(train_data)
+    ohlc_scaled = scaler.fit_transform(ohlc)
+    v_scaled = scaler.fit_transform(v)
 
-    # Scale the test data
-    test_data = scaler.transform(test_data)
-
-    # Convert the data to numpy arrays
-    train_data = np.array(train_data)
-    test_data = np.array(test_data)
-
-    return train_data, test_data
+    return np.concatenate((ohlc_scaled, v_scaled), axis = 1)
 
 
-def moving_avg(df: pd.DataFrame):
-    df['open'] = df['open'].pct_change()  # Create arithmetic returns column
-    df['high'] = df['high'].pct_change()  # Create arithmetic returns column
-    df['low'] = df['low'].pct_change()  # Create arithmetic returns column
-    df['close'] = df['close'].pct_change()  # Create arithmetic returns column
-    df['volume'] = df['volume'].pct_change()
+def load_data(reduce=0):
+    reduce = min(0.999, max(0, reduce))
+    d = pd.read_csv(DATA_PATH)
+    d = d.drop(["Unnamed: 0", "value"], axis=1)
+    return d[int((1 - reduce) * len(d)) : ]
 
-    df.dropna(how='any', axis=0, inplace=True)  # Drop all rows with NaN values
-
-    times = sorted(df.index.values)
-    # last_10pct = sorted(df.index.values)[-int(0.1 * len(times))]  # Last 10% of series
-    last_20pct = sorted(df.index.values)[-int(0.2 * len(times))]  # Last 20% of series
-
-    min_return = min(df[(df.index < last_20pct)][['open', 'high', 'low', 'close']].min(axis=0))
-    max_return = max(df[(df.index < last_20pct)][['open', 'high', 'low', 'close']].max(axis=0))
-
-    df['open'] = (df['open'] - min_return) / (max_return - min_return)
-    df['high'] = (df['high'] - min_return) / (max_return - min_return)
-    df['low'] = (df['low'] - min_return) / (max_return - min_return)
-    df['close'] = (df['close'] - min_return) / (max_return - min_return)
-
-    min_volume = df[(df.index < last_20pct)]['volume'].min(axis=0)
-    max_volume = df[(df.index < last_20pct)]['volume'].max(axis=0)
-
-    df['volume'] = (df['volume'] - min_volume) / (max_volume - min_volume)
-
-    df_train = df[(df.index < last_20pct)]
-    df_test = df[(df.index >= last_20pct)]
-
-    df_train = drop_and_to_np(df_train)
-    df_test = drop_and_to_np(df_test)
-
-    return df_train, df_test
-
-
-def moving_avg_only_one(df: pd.DataFrame):
-    df['open'] = df['open'].pct_change()  # Create arithmetic returns column
-    df['high'] = df['high'].pct_change()  # Create arithmetic returns column
-    df['low'] = df['low'].pct_change()  # Create arithmetic returns column
-    df['close'] = df['close'].pct_change()  # Create arithmetic returns column
-    df['volume'] = df['volume'].pct_change()
-
-    df.dropna(how='any', axis=0, inplace=True)  # Drop all rows with NaN values
-
-    min_return = min(df[['open', 'high', 'low', 'close']].min(axis=0))
-    max_return = max(df[['open', 'high', 'low', 'close']].max(axis=0))
-
-    df['open'] = (df['open'] - min_return) / (max_return - min_return)
-    df['high'] = (df['high'] - min_return) / (max_return - min_return)
-    df['low'] = (df['low'] - min_return) / (max_return - min_return)
-    df['close'] = (df['close'] - min_return) / (max_return - min_return)
-
-    min_volume = df['volume'].min(axis=0)
-    max_volume = df['volume'].max(axis=0)
-
-    df['volume'] = (df['volume'] - min_volume) / (max_volume - min_volume)
-
-    df = drop_and_to_np(df)
-    return df
-
-
-def drop_and_to_np(df: pd.DataFrame):
-    temp = df.copy()
-    temp.drop(columns=['date'], inplace=True)
-    return temp.values
-
-
-
-def to_sequences(df, config):
-    X, y = [], []
-    sl = config.sequence_length
-    for index in range(len(df) - sl):
-        X.append(df[index: index + sl])
-        y.append(df[:, 3][index + sl])
-
-    return np.array(X), np.array(y)
