@@ -1,16 +1,22 @@
 import pyupbit as pu
 import pandas as pd
-import os
-from lib.etc.private_constants import *
-from lib.etc.util import *
 import csv
+
+import os
+import sys
+
+root_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+sys.path.append(root_path)
+
+from lib.etc.private_constants import DATA_PATH
+from lib.etc.util import *
 
 """
 1, 3, 5, 10, 15, 30, 60, 240
 """
 
 def save_ts_data(interval, count=10000000000):
-    tt = os.path.join(TRAIN_DATA_PATH, "ex")
+    tt = os.path.join(DATA_PATH, "ex")
     check_dir(tt)
     interval = 'minute' + interval
     c = os.path.join(tt, interval + ".csv")

@@ -2,8 +2,8 @@
 
 class CustomConfig:
     def __init__(self):
-        self.batch_size = 32
-        self.epochs = 5
+        self.batch_size = 256
+        self.epochs = 100
 
         self.sequence_length = 128
         self.d_k = 256
