@@ -1,4 +1,5 @@
 import pyupbit as pu
+import pandas as pd
 import os
 from lib.etc.private_constants import *
 from lib.etc.util import *
@@ -25,16 +26,20 @@ def save_ts_data(interval, count=10000000000):
 
             w.writerow(data)
 
-
+def load_data(interval, count=10000000000, ticker="KRW-BTC"):
+    df = pu.get_ohlcv(ticker, count=count, interval=interval)
+    df.columns = ['date', 'open', 'high', 'low', 'close', 'volume']
+    df['date'] = pd.to_datetime(df['date'])
+    return df
 
 if __name__ == '__main__':
-    ll = ['1', '3', '5', '10', '15', '30', '60', '240']
+    ll = ['1']
     ll.reverse()
     import time
     for l in ll:
         start = time.time()
         print(l)
-        save_ts_data(l)
+        save_ts_data(l, 128)
         print(time.time() - start)
 
 

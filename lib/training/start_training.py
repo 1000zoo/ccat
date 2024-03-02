@@ -14,8 +14,8 @@ def main():
     train_X, train_y = to_sequences(train, config)
     test_X, test_y = to_sequences(test, config)
     model = get_model(config)
-    save_path = os.path.join(MODEL_PATH, 'Transformer+TimeEmbedding.hdf5')
-    figure_path = os.path.join(FIGURE_PATH, 'Transformer+TimeEmbedding-results.png')
+    save_path = os.path.join(MODEL_PATH, f'Transformer+TimeEmbedding-{config.interval}.hdf5')
+    figure_path = os.path.join(FIGURE_PATH, f'Transformer+TimeEmbedding-results-{config.interval}.png')
 
     callback = keras.callbacks.ModelCheckpoint(
         save_path,
@@ -31,6 +31,36 @@ def main():
                         validation_split=0.1)
 
     model.save(save_path)
+
+    lc = plt.figure()
+    st = lc.suptitle(f"Learning Curve {config.interval}")
+
+    ax1 = lc.add_subplot(311)
+    ax1.plot(history.history['loss'], label='Training loss (MSE)')
+    ax1.plot(history.history['val_loss'], label='Validation loss (MSE)')
+    ax1.set_title("Model loss", fontsize=18)
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Loss (MSE)')
+    ax1.legend(loc="best", fontsize=12)
+
+    ax2 = lc.add_subplot(312)
+    ax2.plot(history.history['mae'], label='Training loss (MAE)')
+    ax2.plot(history.history['val_mae'], label='Validation loss (MAE)')
+    ax2.set_title("Model metric - MAE", fontsize=18)
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Loss (MAE)')
+    ax2.legend(loc="best", fontsize=12)
+
+
+    ax3 = lc.add_subplot(313)
+    ax3.plot(history.history['mape'], label='Training loss (MAPE)')
+    ax3.plot(history.history['val_mape'], label='Validation loss (MAPE)')
+    ax3.set_title("Model metric - MAPE", fontsize=18)
+    ax3.set_xlabel('Epoch')
+    ax3.set_ylabel('Loss (MAPE)')
+    ax3.legend(loc="best", fontsize=12)
+
+    lc.savefig(os.path.join(FIGURE_PATH, f'Transformer+TimeEmbedding-learning-curve-{config.interval}.png'))
 
     model = tf.keras.models.load_model(save_path,
                                        custom_objects={'Time2Vector': Time2Vector,

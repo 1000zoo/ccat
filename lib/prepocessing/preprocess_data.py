@@ -80,6 +80,30 @@ def moving_avg(df: pd.DataFrame):
     return df_train, df_test
 
 
+def moving_avg_only_one(df: pd.DataFrame):
+    df['open'] = df['open'].pct_change()  # Create arithmetic returns column
+    df['high'] = df['high'].pct_change()  # Create arithmetic returns column
+    df['low'] = df['low'].pct_change()  # Create arithmetic returns column
+    df['close'] = df['close'].pct_change()  # Create arithmetic returns column
+    df['volume'] = df['volume'].pct_change()
+
+    df.dropna(how='any', axis=0, inplace=True)  # Drop all rows with NaN values
+
+    min_return = min(df[['open', 'high', 'low', 'close']].min(axis=0))
+    max_return = max(df[['open', 'high', 'low', 'close']].max(axis=0))
+
+    df['open'] = (df['open'] - min_return) / (max_return - min_return)
+    df['high'] = (df['high'] - min_return) / (max_return - min_return)
+    df['low'] = (df['low'] - min_return) / (max_return - min_return)
+    df['close'] = (df['close'] - min_return) / (max_return - min_return)
+
+    min_volume = df['volume'].min(axis=0)
+    max_volume = df['volume'].max(axis=0)
+
+    df['volume'] = (df['volume'] - min_volume) / (max_volume - min_volume)
+
+    df = drop_and_to_np(df)
+    return df
 
 
 def drop_and_to_np(df: pd.DataFrame):
