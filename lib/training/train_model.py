@@ -173,3 +173,23 @@ def get_model(config):
 
     return model
 
+def get_categorical_model(config):
+    input_seq = keras.Input(shape=(config.sequence_length, 5))
+    time_embedding = Time2Vector(config.sequence_length)(input_seq)
+
+    x = keras.layers.Concatenate(axis=-1)([input_seq, time_embedding])
+    x = TransformerEncoder(config.d_k, config.d_v, config.n_heads, config.ff_dim)([x, x, x])
+    x = TransformerEncoder(config.d_k, config.d_v, config.n_heads, config.ff_dim)([x, x, x])
+    x = TransformerEncoder(config.d_k, config.d_v, config.n_heads, config.ff_dim)([x, x, x])
+    x = keras.layers.GlobalAveragePooling1D(data_format='channels_first')(x)
+    x = Dropout(0.1)(x)
+    x = Dense(64, activation='relu')(x)
+    x = Dropout(0.1)(x)
+    output = Dense(3, activation='softmax')(x)
+
+    model = Model(inputs=input_seq, outputs=output)
+    model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+
+    model.summary()
+
+    return model

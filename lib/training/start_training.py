@@ -11,8 +11,9 @@ from matplotlib import pyplot as plt
 from lib.etc.train_parameters import CustomConfig
 from lib.etc.private_constants import PathConfig
 
-from train_model import get_model
+from train_model import get_model, get_categorical_model
 from lib.prepocessing.preprocess_data import *
+from sklearn.utils.class_weight import compute_class_weight
 
 class CustomModelCheckpoint(tf.keras.callbacks.Callback):
     def __init__(self, save_freq, prefix : str):
@@ -46,6 +47,28 @@ def fit(train_dataset, val_dataset, config : CustomConfig, path_config : PathCon
         ]
     )
 
+def fit_categorical(X_train, y_train, X_val, y_val, config : CustomConfig, path_config : PathConfig):
+    model = get_categorical_model(config)
+
+    #모델 설정
+    y_train_int_labels = np.argmax(y_train, axis=1)
+
+    # 고유한 클래스 레이블을 찾습니다.
+    classes = np.unique(y_train_int_labels)
+
+    class_weights = compute_class_weight(class_weight="balanced", classes=classes, y=y_train_int_labels)
+    class_weight_dict = dict(enumerate(class_weights))
+
+    history = model.fit(
+        X_train, y_train, 
+        epochs=config.epochs, batch_size=config.batch_size, 
+        class_weight=class_weight_dict,
+        validation_data=(X_val, y_val),
+        validation_batch_size=config.batch_size,
+        callbacks=[CustomModelCheckpoint(save_freq=5, prefix=path_config.checkpoint_path)]
+    )
+    model.save(path_config.model_path)
+    return history
 
 def main():
     config = CustomConfig()
@@ -53,10 +76,16 @@ def main():
     print("loaded configs")
 
     # train, val, test = load_dataset(config.sequence_length, config.batch_size)
-    train, val, test = load_preprocessed_data(config.sequence_length, reduce=0.2)
+    train, val, test = load_categorical_data(
+        "/Users/cjswl/python_data/cryptoAI-data/data/anomaly-detection data.npz",
+        rate=0.001
+    )
+    print(train[0].shape, train[1].shape)
+    print(val[0].shape, val[1].shape)
+    print(test[0].shape, test[1].shape)
     print("dataset load success")
 
-    history = fit(train, val, config, path_config)
+    history = fit_categorical(train[0], train[1], val[0], val[1], config, path_config)
 
 
 

@@ -6,9 +6,37 @@ sys.path.append(root_path)
 
 import pandas as pd
 import numpy as np
+
+from keras import utils
 from sklearn.preprocessing import MinMaxScaler
 from lib.etc.private_constants import DATA_PATH
 from lib.etc.train_parameters import CustomConfig
+
+def load_categorical_data(data_path, rate=0.1):
+    data = np.load(data_path)
+
+    X_result = data["X_result"]
+    y_result = data["y_result"]
+
+    X_result = X_result[int(len(X_result) * (1 - rate)) : ]
+    y_result = y_result[int(len(y_result) * (1 - rate)) : ]
+
+    X_result_shape = X_result.shape
+    X_result_2D = X_result.reshape(-1, X_result_shape[2])
+
+    X_result_2D_scaled = MinMaxScaler().fit_transform(X_result_2D)
+    X_result_scaled = X_result_2D_scaled.reshape((X_result_shape))
+    y_result_encoded = utils.to_categorical(y_result, num_classes=3)
+        
+    split_val = int(len(X_result) * 0.2)
+    split_test = int(len(X_result) * 0.1)
+
+    train = X_result_scaled[split_val : ], y_result_encoded[split_val : ]
+    val = X_result_scaled[split_test : split_val], y_result_encoded[split_test : split_val]
+    test = X_result_scaled[: split_test], y_result_encoded[: split_test]
+
+    return train, val, test
+
 
 def load_preprocessed_data(sequence_length, reduce=0):
     data = load_data(reduce)
